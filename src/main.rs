@@ -44,7 +44,11 @@ impl App {
         self.renderer.render_svg(self.runtime.svg_data())
     }
 
-    fn present_frame(&mut self) {
+    fn present_frame(&mut self, dirty: &[runtime::DirtyRect]) {
+        if dirty.is_empty() {
+            return;
+        }
+
         let pixmap = match self.render_frame() {
             Ok(p) => p,
             Err(_) => {
@@ -52,10 +56,11 @@ impl App {
                 return;
             }
         };
-
         let pix_data = pixmap.data(); // RGBA premultiplied
 
-        let Some(ref mut surface) = self.surface else { return };
+        let Some(ref mut surface) = self.surface else {
+            return;
+        };
 
         let (w, h) = self.runtime.dimensions();
         let non_zero_w = NonZeroU32::new(w).unwrap();
@@ -66,16 +71,32 @@ impl App {
         }
 
         if let Ok(mut buffer) = surface.buffer_mut() {
-            let w = buffer.width().get() as usize;
-            let h = buffer.height().get() as usize;
+            let bw = buffer.width().get() as usize;
+            let bh = buffer.height().get() as usize;
 
-            // Convert RGBA u8 -> native-endian BGRA u32 for softbuffer.
-            for (i, chunk) in pix_data.chunks_exact(4).enumerate().take(w * h) {
-                let b = chunk[2] as u32;
-                let g = chunk[1] as u32;
-                let r = chunk[0] as u32;
-                let a = chunk[3] as u32;
-                buffer[i] = b | (g << 8) | (r << 16) | (a << 24);
+            for r in dirty {
+                let x0 = (r.x as usize).min(bw);
+                let y0 = (r.y as usize).min(bh);
+                let x1 = ((r.x + r.w) as usize).min(bw);
+                let y1 = ((r.y + r.h) as usize).min(bh);
+                if x1 <= x0 || y1 <= y0 {
+                    continue;
+                }
+
+                for y in y0..y1 {
+                    for x in x0..x1 {
+                        let i = y * bw + x;
+                        let p = i * 4;
+                        if p + 3 >= pix_data.len() {
+                            continue;
+                        }
+                        let b = pix_data[p + 2] as u32;
+                        let g = pix_data[p + 1] as u32;
+                        let r = pix_data[p] as u32;
+                        let a = pix_data[p + 3] as u32;
+                        buffer[i] = b | (g << 8) | (r << 16) | (a << 24);
+                    }
+                }
             }
 
             buffer.present().ok();
@@ -115,7 +136,8 @@ impl ApplicationHandler for App {
         self.surface = Some(surface);
         self.window = Some(window);
 
-        self.present_frame();
+        let dirty = self.runtime.take_dirty_rects();
+        self.present_frame(&dirty);
     }
 
     fn window_event(
@@ -130,7 +152,12 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 self.runtime.tick_animation();
-                self.present_frame();
+                let dirty = self.runtime.take_dirty_rects();
+                if !dirty.is_empty() {
+                    let touched: u64 = dirty.iter().map(|r| (r.w as u64) * (r.h as u64)).sum();
+                    self.present_frame(&dirty);
+                    println!("PERF: dirty_rects={} pixels={}", dirty.len(), touched);
+                }
                 if self.runtime.is_animating() {
                     if let Some(ref w) = self.window {
                         w.request_redraw();

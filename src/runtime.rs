@@ -4,6 +4,14 @@ use std::time::{Duration, Instant};
 
 const PANE_ANIMATION_MS: u64 = 160;
 
+#[derive(Debug, Clone, Copy)]
+pub struct DirtyRect {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
 #[derive(Debug, Clone)]
 pub struct WidgetInfo {
     pub id: String,
@@ -48,6 +56,7 @@ pub struct VbrRuntime {
     pane_transform: HashMap<String, (f64, f64)>,
     main_transform: (f64, f64),
     transition: Option<PaneTransition>,
+    dirty_rects: Vec<DirtyRect>,
 }
 
 impl VbrRuntime {
@@ -110,6 +119,12 @@ impl VbrRuntime {
             pane_transform,
             main_transform: (0.0, 0.0),
             transition: None,
+            dirty_rects: vec![DirtyRect {
+                x: 0,
+                y: 0,
+                w: width,
+                h: height,
+            }],
         })
     }
 
@@ -125,10 +140,30 @@ impl VbrRuntime {
         self.transition.is_some()
     }
 
+    pub fn take_dirty_rects(&mut self) -> Vec<DirtyRect> {
+        coalesce_dirty_rects(std::mem::take(&mut self.dirty_rects))
+    }
+
+    fn mark_full_dirty(&mut self) {
+        self.dirty_rects.push(DirtyRect {
+            x: 0,
+            y: 0,
+            w: self.width,
+            h: self.height,
+        });
+    }
+
     pub fn tick_animation(&mut self) {
         let Some(tr) = self.transition.clone() else {
             return;
         };
+
+        let old_pane = self
+            .pane_transform
+            .get(&tr.section)
+            .copied()
+            .unwrap_or((0.0, 0.0));
+        let old_main = self.main_transform;
 
         let elapsed = Instant::now().saturating_duration_since(tr.start);
         let t = (elapsed.as_secs_f64() / tr.duration.as_secs_f64()).clamp(0.0, 1.0);
@@ -146,6 +181,8 @@ impl VbrRuntime {
         self.set_section_transform(&tr.section, px, py);
         self.set_main_transform(mx, my);
 
+        self.mark_transition_dirty(&tr.section, old_pane, (px, py), old_main, (mx, my));
+
         if (t - 1.0).abs() < f64::EPSILON {
             if tr.show {
                 self.pane_visibility.insert(tr.section.clone(), true);
@@ -159,6 +196,69 @@ impl VbrRuntime {
         self.svg_data = self.svg_current.as_bytes().to_vec();
     }
 
+    fn mark_widget_dirty(&mut self, bounds: (f64, f64, f64, f64)) {
+        self.mark_bounds_dirty(bounds, 2.0);
+    }
+
+    fn mark_bounds_dirty(&mut self, bounds: (f64, f64, f64, f64), pad: f64) {
+        let x0 = (bounds.0 - pad).max(0.0) as u32;
+        let y0 = (bounds.1 - pad).max(0.0) as u32;
+        let x1 = (bounds.0 + bounds.2 + pad).min(self.width as f64) as u32;
+        let y1 = (bounds.1 + bounds.3 + pad).min(self.height as f64) as u32;
+        if x1 > x0 && y1 > y0 {
+            self.dirty_rects.push(DirtyRect {
+                x: x0,
+                y: y0,
+                w: x1 - x0,
+                h: y1 - y0,
+            });
+        }
+    }
+
+    fn mark_transition_dirty(
+        &mut self,
+        section: &str,
+        old_pane: (f64, f64),
+        new_pane: (f64, f64),
+        old_main: (f64, f64),
+        new_main: (f64, f64),
+    ) {
+        let pane_size = self.pane_size.get(section).copied().unwrap_or(0.0);
+        let pane_bounds = match section {
+            "left" => (0.0, 0.0, pane_size, self.height as f64),
+            "right" => ((self.width as f64 - pane_size).max(0.0), 0.0, pane_size, self.height as f64),
+            "top" => (0.0, 0.0, self.width as f64, pane_size),
+            "bottom" => (0.0, (self.height as f64 - pane_size).max(0.0), self.width as f64, pane_size),
+            _ => (0.0, 0.0, self.width as f64, self.height as f64),
+        };
+
+        self.mark_bounds_dirty(
+            (
+                pane_bounds.0 + old_pane.0,
+                pane_bounds.1 + old_pane.1,
+                pane_bounds.2,
+                pane_bounds.3,
+            ),
+            2.0,
+        );
+        self.mark_bounds_dirty(
+            (
+                pane_bounds.0 + new_pane.0,
+                pane_bounds.1 + new_pane.1,
+                pane_bounds.2,
+                pane_bounds.3,
+            ),
+            2.0,
+        );
+
+        let main_moved = (old_main.0 - new_main.0).abs() > f64::EPSILON
+            || (old_main.1 - new_main.1).abs() > f64::EPSILON;
+        if main_moved {
+            self.mark_bounds_dirty((old_main.0, old_main.1, self.width as f64, self.height as f64), 1.0);
+            self.mark_bounds_dirty((new_main.0, new_main.1, self.width as f64, self.height as f64), 1.0);
+        }
+    }
+
     pub fn handle_click(&mut self, x: f64, y: f64) -> String {
         if self.transition.is_some() {
             return format!("CLICK: animating at ({:.0}, {:.0})", x, y);
@@ -168,6 +268,7 @@ impl VbrRuntime {
             if let (Some(fill_id), Some(down_fill)) = (&w.fill_id, &w.mousedown_fill) {
                 self.set_fill_for_fill_id(fill_id, down_fill);
                 self.svg_data = self.svg_current.as_bytes().to_vec();
+                self.mark_widget_dirty(w.bounds);
             }
             self.pressed_widget_id = Some(w.id.clone());
 
@@ -202,6 +303,9 @@ impl VbrRuntime {
         if let (Some(fill_id), Some(normal_fill)) = (fill_id, normal_fill) {
             self.set_fill_for_fill_id(&fill_id, &normal_fill);
             self.svg_data = self.svg_current.as_bytes().to_vec();
+            if let Some(w) = self.widgets_by_id.get(&widget_id) {
+                self.mark_widget_dirty(w.bounds);
+            }
         }
     }
 
@@ -284,6 +388,7 @@ impl VbrRuntime {
                 self.set_main_transform(0.0, 0.0);
                 self.transition = None;
                 self.svg_data = self.svg_current.as_bytes().to_vec();
+                self.mark_full_dirty();
             }
             _ => {}
         }
@@ -749,4 +854,47 @@ fn update_extents(
 
 fn parse_attr(node: &roxmltree::Node, name: &str) -> Option<f64> {
     node.attribute(name)?.parse::<f64>().ok()
+}
+
+fn coalesce_dirty_rects(mut rects: Vec<DirtyRect>) -> Vec<DirtyRect> {
+    if rects.is_empty() {
+        return rects;
+    }
+
+    // 1) Sort for deterministic merges
+    rects.sort_by_key(|r| (r.y, r.x));
+
+    // 2) Merge overlapping/adjacent rectangles greedily
+    let mut merged: Vec<DirtyRect> = Vec::new();
+    for r in rects {
+        if let Some(last) = merged.last_mut() {
+            let ax0 = last.x as i64;
+            let ay0 = last.y as i64;
+            let ax1 = (last.x + last.w) as i64;
+            let ay1 = (last.y + last.h) as i64;
+
+            let bx0 = r.x as i64;
+            let by0 = r.y as i64;
+            let bx1 = (r.x + r.w) as i64;
+            let by1 = (r.y + r.h) as i64;
+
+            let overlap_or_adjacent = ax0 <= bx1 + 1 && bx0 <= ax1 + 1 && ay0 <= by1 + 1 && by0 <= ay1 + 1;
+            if overlap_or_adjacent {
+                let nx0 = ax0.min(bx0) as u32;
+                let ny0 = ay0.min(by0) as u32;
+                let nx1 = ax1.max(bx1) as u32;
+                let ny1 = ay1.max(by1) as u32;
+                *last = DirtyRect {
+                    x: nx0,
+                    y: ny0,
+                    w: nx1.saturating_sub(nx0),
+                    h: ny1.saturating_sub(ny0),
+                };
+                continue;
+            }
+        }
+        merged.push(r);
+    }
+
+    merged
 }
