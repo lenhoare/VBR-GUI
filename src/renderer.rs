@@ -11,10 +11,14 @@ impl Renderer {
 
     /// Load SVG data and render it to a full Pixmap.
     pub fn render_svg(&self, svg_data: &[u8]) -> Result<tiny_skia::Pixmap, Box<dyn std::error::Error>> {
-        let opt = usvg::Options {
+        let mut opt = usvg::Options {
             font_family: "DejaVu Sans".to_string(),
             ..usvg::Options::default()
         };
+        // usvg does not auto-load system fonts. Without this, text nodes parse
+        // but render as empty glyph runs.
+        opt.fontdb_mut().load_system_fonts();
+
         let tree = usvg::Tree::from_data(svg_data, &opt)?;
 
         let mut pixmap = tiny_skia::Pixmap::new(self.width, self.height)
