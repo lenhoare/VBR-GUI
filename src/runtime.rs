@@ -181,7 +181,13 @@ impl VbrRuntime {
         self.set_section_transform(&tr.section, px, py);
         self.set_main_transform(mx, my);
 
+        let pre_dirty = self.dirty_rects.len();
         self.mark_transition_dirty(&tr.section, old_pane, (px, py), old_main, (mx, my));
+        if self.dirty_rects.len() == pre_dirty {
+            // Fallback: if bounds math yields no visible region this frame,
+            // force a full redraw so animation never appears frozen.
+            self.mark_full_dirty();
+        }
 
         if (t - 1.0).abs() < f64::EPSILON {
             if tr.show {
