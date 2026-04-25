@@ -25,6 +25,10 @@ pub struct VbrRuntime {
     widgets_by_id: HashMap<String, WidgetInfo>,
     pressed_widget_id: Option<String>,
     section_order: Vec<String>,
+    nudge_left: f64,
+    nudge_right: f64,
+    nudge_top: f64,
+    nudge_bottom: f64,
 }
 
 impl VbrRuntime {
@@ -46,6 +50,7 @@ impl VbrRuntime {
         pane_visibility.insert("bottom".to_string(), false);
 
         let hit_table = build_hit_table(&svg_current);
+        let (nudge_left, nudge_right, nudge_top, nudge_bottom) = extract_main_nudges(&svg_current);
         let mut widgets_by_id = HashMap::new();
         for w in &hit_table {
             widgets_by_id.insert(w.id.clone(), w.clone());
@@ -70,6 +75,10 @@ impl VbrRuntime {
             widgets_by_id,
             pressed_widget_id: None,
             section_order,
+            nudge_left,
+            nudge_right,
+            nudge_top,
+            nudge_bottom,
         })
     }
 
@@ -88,6 +97,10 @@ impl VbrRuntime {
                 self.svg_data = self.svg_current.as_bytes().to_vec();
             }
             self.pressed_widget_id = Some(w.id.clone());
+
+            if let Some(action) = &w.action {
+                self.apply_builtin_action(action);
+            }
 
             let action_str = match &w.action {
                 Some(a) => format!(" action=\"{}\"", a),
@@ -175,6 +188,170 @@ impl VbrRuntime {
 
         self.svg_current.replace_range(start..=end, &tag);
     }
+
+    fn apply_builtin_action(&mut self, action: &str) {
+        match action {
+            "show-left-overlay" => self.show_section("left", false),
+            "show-left-nudge" => self.show_section("left", true),
+            "show-right-overlay" => self.show_section("right", false),
+            "show-right-nudge" => self.show_section("right", true),
+            "show-top-overlay" => self.show_section("top", false),
+            "show-bottom-overlay" => self.show_section("bottom", false),
+            "hide-left" => self.hide_section("left"),
+            "hide-right" => self.hide_section("right"),
+            "hide-top" => self.hide_section("top"),
+            "hide-bottom" => self.hide_section("bottom"),
+            "hide-all" => {
+                self.hide_section("left");
+                self.hide_section("right");
+                self.hide_section("top");
+                self.hide_section("bottom");
+            }
+            _ => {}
+        }
+    }
+
+    fn show_section(&mut self, section: &str, nudge: bool) {
+        for s in ["left", "right", "top", "bottom"] {
+            self.pane_visibility.insert(s.to_string(), false);
+            self.set_section_display(s, false);
+        }
+
+        self.pane_visibility.insert(section.to_string(), true);
+        self.set_section_display(section, true);
+
+        if nudge {
+            self.apply_main_nudge_for(section);
+        } else {
+            self.clear_main_nudge();
+        }
+
+        self.svg_data = self.svg_current.as_bytes().to_vec();
+    }
+
+    fn hide_section(&mut self, section: &str) {
+        self.pane_visibility.insert(section.to_string(), false);
+        self.set_section_display(section, false);
+
+        if section == "left" || section == "right" || section == "top" || section == "bottom" {
+            self.clear_main_nudge();
+        }
+
+        self.svg_data = self.svg_current.as_bytes().to_vec();
+    }
+
+    fn set_section_display(&mut self, section: &str, visible: bool) {
+        let sec_attr = format!("vbr:section=\"{}\"", section);
+        let Some(sec_pos) = self.svg_current.find(&sec_attr) else {
+            return;
+        };
+
+        let start = self.svg_current[..sec_pos].rfind('<').unwrap_or(sec_pos);
+        let end = self.svg_current[sec_pos..]
+            .find('>')
+            .map(|i| sec_pos + i)
+            .unwrap_or(self.svg_current.len());
+
+        let mut tag = self.svg_current[start..=end].to_string();
+        let target = if visible { "inline" } else { "none" };
+
+        if let Some(pos) = tag.find("display=\"") {
+            let val_start = pos + "display=\"".len();
+            if let Some(rel_end) = tag[val_start..].find('"') {
+                let val_end = val_start + rel_end;
+                tag.replace_range(val_start..val_end, target);
+            }
+        } else {
+            let insert_at = tag.rfind('>').unwrap_or(tag.len());
+            let insert = format!(" display=\"{}\"", target);
+            tag.insert_str(insert_at, &insert);
+        }
+
+        self.svg_current.replace_range(start..=end, &tag);
+    }
+
+    fn apply_main_nudge_for(&mut self, section: &str) {
+        let (dx, dy) = match section {
+            "left" => (self.nudge_left, 0.0),
+            "right" => (-self.nudge_right, 0.0),
+            "top" => (0.0, self.nudge_top),
+            "bottom" => (0.0, -self.nudge_bottom),
+            _ => (0.0, 0.0),
+        };
+        self.set_main_transform(dx, dy);
+    }
+
+    fn clear_main_nudge(&mut self) {
+        self.set_main_transform(0.0, 0.0);
+    }
+
+    fn set_main_transform(&mut self, dx: f64, dy: f64) {
+        let main_attr = "id=\"vbr-main\"";
+        let Some(main_pos) = self.svg_current.find(main_attr) else {
+            return;
+        };
+
+        let start = self.svg_current[..main_pos].rfind('<').unwrap_or(main_pos);
+        let end = self.svg_current[main_pos..]
+            .find('>')
+            .map(|i| main_pos + i)
+            .unwrap_or(self.svg_current.len());
+
+        let mut tag = self.svg_current[start..=end].to_string();
+        let transform_value = if dx == 0.0 && dy == 0.0 {
+            None
+        } else {
+            Some(format!("translate({:.0} {:.0})", dx, dy))
+        };
+
+        if let Some(pos) = tag.find("transform=\"") {
+            let val_start = pos + "transform=\"".len();
+            if let Some(rel_end) = tag[val_start..].find('"') {
+                let val_end = val_start + rel_end;
+                if let Some(v) = transform_value {
+                    tag.replace_range(val_start..val_end, &v);
+                } else {
+                    let rm_start = pos.saturating_sub(1);
+                    let rm_end = val_end + 1;
+                    if rm_end <= tag.len() {
+                        tag.replace_range(rm_start..rm_end, "");
+                    }
+                }
+            }
+        } else if let Some(v) = transform_value {
+            let insert_at = tag.rfind('>').unwrap_or(tag.len());
+            let insert = format!(" transform=\"{}\"", v);
+            tag.insert_str(insert_at, &insert);
+        }
+
+        self.svg_current.replace_range(start..=end, &tag);
+    }
+}
+
+fn extract_main_nudges(svg: &str) -> (f64, f64, f64, f64) {
+    let doc = match roxmltree::Document::parse(svg) {
+        Ok(d) => d,
+        Err(_) => return (0.0, 0.0, 0.0, 0.0),
+    };
+    let ns = doc
+        .root_element()
+        .lookup_namespace_uri(Some("vbr"))
+        .unwrap_or("http://vbr.dev/ui");
+
+    for n in doc.descendants() {
+        if !n.is_element() {
+            continue;
+        }
+        if n.tag_name().name() == "g" && n.attribute("id") == Some("vbr-main") {
+            let left = n.attribute((ns, "nudge-left")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+            let right = n.attribute((ns, "nudge-right")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+            let top = n.attribute((ns, "nudge-top")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+            let bottom = n.attribute((ns, "nudge-bottom")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+            return (left, right, top, bottom);
+        }
+    }
+
+    (0.0, 0.0, 0.0, 0.0)
 }
 
 fn build_hit_table(svg: &str) -> Vec<WidgetInfo> {
