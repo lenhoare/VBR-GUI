@@ -5,8 +5,10 @@ use std::num::NonZeroU32;
 use std::path::Path;
 use std::rc::Rc;
 use winit::application::ApplicationHandler;
+use winit::dpi::PhysicalPosition;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
+use winit::event::{ElementState, MouseButton};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, OwnedDisplayHandle};
 use winit::window::{Window, WindowAttributes};
 
@@ -18,6 +20,8 @@ struct App {
     context: Option<softbuffer::Context<OwnedDisplayHandle>>,
     runtime: runtime::VbrRuntime,
     renderer: renderer::Renderer,
+    /// Last known cursor position (SVG/physical coordinates)
+    cursor_pos: PhysicalPosition<f64>,
 }
 
 impl App {
@@ -32,6 +36,7 @@ impl App {
             context: None,
             runtime,
             renderer,
+            cursor_pos: PhysicalPosition { x: 0.0, y: 0.0 },
         })
     }
 
@@ -125,6 +130,38 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 self.present_frame();
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                self.cursor_pos = position;
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            } => {
+                // Map cursor position from window pixels to SVG coordinates.
+                // This fixes hit testing on HiDPI / scaled displays.
+                let (svg_w, svg_h) = self.runtime.dimensions();
+                let (mapped_x, mapped_y) = if let Some(ref w) = self.window {
+                    let win = w.inner_size();
+                    if win.width > 0 && win.height > 0 {
+                        let sx = svg_w as f64 / win.width as f64;
+                        let sy = svg_h as f64 / win.height as f64;
+                        (self.cursor_pos.x * sx, self.cursor_pos.y * sy)
+                    } else {
+                        (self.cursor_pos.x, self.cursor_pos.y)
+                    }
+                } else {
+                    (self.cursor_pos.x, self.cursor_pos.y)
+                };
+
+                let msg = self.runtime.handle_click(mapped_x, mapped_y);
+                println!("{}", msg);
+
+                // Request redraw so the window stays responsive
+                if let Some(ref w) = self.window {
+                    w.request_redraw();
+                }
             }
             _ => {}
         }
