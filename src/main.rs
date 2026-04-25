@@ -139,8 +139,6 @@ impl ApplicationHandler for App {
                 button: MouseButton::Left,
                 ..
             } => {
-                // Map cursor position from window pixels to SVG coordinates.
-                // This fixes hit testing on HiDPI / scaled displays.
                 let (svg_w, svg_h) = self.runtime.dimensions();
                 let (mapped_x, mapped_y) = if let Some(ref w) = self.window {
                     let win = w.inner_size();
@@ -158,7 +156,16 @@ impl ApplicationHandler for App {
                 let msg = self.runtime.handle_click(mapped_x, mapped_y);
                 println!("{}", msg);
 
-                // Request redraw so the window stays responsive
+                if let Some(ref w) = self.window {
+                    w.request_redraw();
+                }
+            }
+            WindowEvent::MouseInput {
+                state: ElementState::Released,
+                button: MouseButton::Left,
+                ..
+            } => {
+                self.runtime.handle_mouse_up();
                 if let Some(ref w) = self.window {
                     w.request_redraw();
                 }
