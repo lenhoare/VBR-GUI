@@ -129,7 +129,13 @@ impl ApplicationHandler for App {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
+                self.runtime.tick_animation();
                 self.present_frame();
+                if self.runtime.is_animating() {
+                    if let Some(ref w) = self.window {
+                        w.request_redraw();
+                    }
+                }
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_pos = position;

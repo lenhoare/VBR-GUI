@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone)]
 pub struct WidgetInfo {
@@ -12,6 +13,19 @@ pub struct WidgetInfo {
     pub fill_id: Option<String>,
     pub normal_fill: Option<String>,
     pub mousedown_fill: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct PaneTransition {
+    section: String,
+    show: bool,
+    nudge: bool,
+    start: Instant,
+    duration: Duration,
+    pane_from: (f64, f64),
+    pane_to: (f64, f64),
+    main_from: (f64, f64),
+    main_to: (f64, f64),
 }
 
 pub struct VbrRuntime {
@@ -29,6 +43,10 @@ pub struct VbrRuntime {
     nudge_right: f64,
     nudge_top: f64,
     nudge_bottom: f64,
+    pane_size: HashMap<String, f64>,
+    pane_transform: HashMap<String, (f64, f64)>,
+    main_transform: (f64, f64),
+    transition: Option<PaneTransition>,
 }
 
 impl VbrRuntime {
@@ -50,7 +68,6 @@ impl VbrRuntime {
         pane_visibility.insert("bottom".to_string(), false);
 
         let hit_table = build_hit_table(&svg_current);
-        let (nudge_left, nudge_right, nudge_top, nudge_bottom) = extract_main_nudges(&svg_current);
         let mut widgets_by_id = HashMap::new();
         for w in &hit_table {
             widgets_by_id.insert(w.id.clone(), w.clone());
@@ -63,6 +80,15 @@ impl VbrRuntime {
             "right".to_string(),
             "main".to_string(),
         ];
+
+        let (nudge_left, nudge_right, nudge_top, nudge_bottom) = extract_main_nudges(&svg_current);
+        let pane_size = extract_pane_sizes(&svg_current);
+
+        let mut pane_transform = HashMap::new();
+        pane_transform.insert("left".to_string(), (0.0, 0.0));
+        pane_transform.insert("right".to_string(), (0.0, 0.0));
+        pane_transform.insert("top".to_string(), (0.0, 0.0));
+        pane_transform.insert("bottom".to_string(), (0.0, 0.0));
 
         Ok(Self {
             svg_data,
@@ -79,6 +105,10 @@ impl VbrRuntime {
             nudge_right,
             nudge_top,
             nudge_bottom,
+            pane_size,
+            pane_transform,
+            main_transform: (0.0, 0.0),
+            transition: None,
         })
     }
 
@@ -90,7 +120,47 @@ impl VbrRuntime {
         (self.width, self.height)
     }
 
+    pub fn is_animating(&self) -> bool {
+        self.transition.is_some()
+    }
+
+    pub fn tick_animation(&mut self) {
+        let Some(tr) = self.transition.clone() else {
+            return;
+        };
+
+        let elapsed = Instant::now().saturating_duration_since(tr.start);
+        let t = (elapsed.as_secs_f64() / tr.duration.as_secs_f64()).clamp(0.0, 1.0);
+
+        let px = lerp(tr.pane_from.0, tr.pane_to.0, t);
+        let py = lerp(tr.pane_from.1, tr.pane_to.1, t);
+        let mx = lerp(tr.main_from.0, tr.main_to.0, t);
+        let my = lerp(tr.main_from.1, tr.main_to.1, t);
+
+        self.pane_transform.insert(tr.section.clone(), (px, py));
+        self.main_transform = (mx, my);
+
+        self.set_section_transform(&tr.section, px, py);
+        self.set_main_transform(mx, my);
+
+        if (t - 1.0).abs() < f64::EPSILON {
+            if tr.show {
+                self.pane_visibility.insert(tr.section.clone(), true);
+            } else {
+                self.pane_visibility.insert(tr.section.clone(), false);
+                self.set_section_display(&tr.section, false);
+            }
+            self.transition = None;
+        }
+
+        self.svg_data = self.svg_current.as_bytes().to_vec();
+    }
+
     pub fn handle_click(&mut self, x: f64, y: f64) -> String {
+        if self.transition.is_some() {
+            return format!("CLICK: animating at ({:.0}, {:.0})", x, y);
+        }
+
         if let Some(w) = self.top_hit_for_point(x, y).cloned() {
             if let (Some(fill_id), Some(down_fill)) = (&w.fill_id, &w.mousedown_fill) {
                 self.set_fill_for_fill_id(fill_id, down_fill);
@@ -191,53 +261,83 @@ impl VbrRuntime {
 
     fn apply_builtin_action(&mut self, action: &str) {
         match action {
-            "show-left-overlay" => self.show_section("left", false),
-            "show-left-nudge" => self.show_section("left", true),
-            "show-right-overlay" => self.show_section("right", false),
-            "show-right-nudge" => self.show_section("right", true),
-            "show-top-overlay" => self.show_section("top", false),
-            "show-bottom-overlay" => self.show_section("bottom", false),
-            "hide-left" => self.hide_section("left"),
-            "hide-right" => self.hide_section("right"),
-            "hide-top" => self.hide_section("top"),
-            "hide-bottom" => self.hide_section("bottom"),
+            "show-left-overlay" => self.start_transition("left", true, false),
+            "show-left-nudge" => self.start_transition("left", true, true),
+            "show-right-overlay" => self.start_transition("right", true, false),
+            "show-right-nudge" => self.start_transition("right", true, true),
+            "show-top-overlay" => self.start_transition("top", true, false),
+            "show-bottom-overlay" => self.start_transition("bottom", true, false),
+            "hide-left" => self.start_transition("left", false, false),
+            "hide-right" => self.start_transition("right", false, false),
+            "hide-top" => self.start_transition("top", false, false),
+            "hide-bottom" => self.start_transition("bottom", false, false),
             "hide-all" => {
-                self.hide_section("left");
-                self.hide_section("right");
-                self.hide_section("top");
-                self.hide_section("bottom");
+                for s in ["left", "right", "top", "bottom"] {
+                    self.pane_visibility.insert(s.to_string(), false);
+                    self.set_section_display(s, false);
+                    self.set_section_transform(s, 0.0, 0.0);
+                }
+                self.main_transform = (0.0, 0.0);
+                self.set_main_transform(0.0, 0.0);
+                self.transition = None;
+                self.svg_data = self.svg_current.as_bytes().to_vec();
             }
             _ => {}
         }
     }
 
-    fn show_section(&mut self, section: &str, nudge: bool) {
-        for s in ["left", "right", "top", "bottom"] {
-            self.pane_visibility.insert(s.to_string(), false);
-            self.set_section_display(s, false);
+    fn start_transition(&mut self, section: &str, show: bool, nudge: bool) {
+        // Hide other panes when showing one.
+        if show {
+            for s in ["left", "right", "top", "bottom"] {
+                if s != section {
+                    self.pane_visibility.insert(s.to_string(), false);
+                    self.set_section_display(s, false);
+                    self.set_section_transform(s, 0.0, 0.0);
+                }
+            }
+            self.set_section_display(section, true);
+            self.pane_visibility.insert(section.to_string(), true);
         }
 
-        self.pane_visibility.insert(section.to_string(), true);
-        self.set_section_display(section, true);
+        let size = self.pane_size.get(section).copied().unwrap_or(0.0);
+        let off = offscreen_offset(section, size);
 
-        if nudge {
-            self.apply_main_nudge_for(section);
+        let pane_from = if show {
+            off
         } else {
-            self.clear_main_nudge();
-        }
+            self.pane_transform.get(section).copied().unwrap_or((0.0, 0.0))
+        };
+        let pane_to = if show { (0.0, 0.0) } else { off };
 
+        let main_from = self.main_transform;
+        let main_to = if show && nudge { self.nudge_target(section) } else { (0.0, 0.0) };
+
+        self.transition = Some(PaneTransition {
+            section: section.to_string(),
+            show,
+            nudge,
+            start: Instant::now(),
+            duration: Duration::from_millis(160),
+            pane_from,
+            pane_to,
+            main_from,
+            main_to,
+        });
+
+        let sec = section.to_string();
+        self.set_section_transform(&sec, pane_from.0, pane_from.1);
         self.svg_data = self.svg_current.as_bytes().to_vec();
     }
 
-    fn hide_section(&mut self, section: &str) {
-        self.pane_visibility.insert(section.to_string(), false);
-        self.set_section_display(section, false);
-
-        if section == "left" || section == "right" || section == "top" || section == "bottom" {
-            self.clear_main_nudge();
+    fn nudge_target(&self, section: &str) -> (f64, f64) {
+        match section {
+            "left" => (self.nudge_left, 0.0),
+            "right" => (-self.nudge_right, 0.0),
+            "top" => (0.0, self.nudge_top),
+            "bottom" => (0.0, -self.nudge_bottom),
+            _ => (0.0, 0.0),
         }
-
-        self.svg_data = self.svg_current.as_bytes().to_vec();
     }
 
     fn set_section_display(&mut self, section: &str, visible: bool) {
@@ -270,19 +370,47 @@ impl VbrRuntime {
         self.svg_current.replace_range(start..=end, &tag);
     }
 
-    fn apply_main_nudge_for(&mut self, section: &str) {
-        let (dx, dy) = match section {
-            "left" => (self.nudge_left, 0.0),
-            "right" => (-self.nudge_right, 0.0),
-            "top" => (0.0, self.nudge_top),
-            "bottom" => (0.0, -self.nudge_bottom),
-            _ => (0.0, 0.0),
+    fn set_section_transform(&mut self, section: &str, dx: f64, dy: f64) {
+        let sec_attr = format!("vbr:section=\"{}\"", section);
+        let Some(sec_pos) = self.svg_current.find(&sec_attr) else {
+            return;
         };
-        self.set_main_transform(dx, dy);
-    }
 
-    fn clear_main_nudge(&mut self) {
-        self.set_main_transform(0.0, 0.0);
+        let start = self.svg_current[..sec_pos].rfind('<').unwrap_or(sec_pos);
+        let end = self.svg_current[sec_pos..]
+            .find('>')
+            .map(|i| sec_pos + i)
+            .unwrap_or(self.svg_current.len());
+
+        let mut tag = self.svg_current[start..=end].to_string();
+        let transform_value = if dx == 0.0 && dy == 0.0 {
+            None
+        } else {
+            Some(format!("translate({:.0} {:.0})", dx, dy))
+        };
+
+        if let Some(pos) = tag.find("transform=\"") {
+            let val_start = pos + "transform=\"".len();
+            if let Some(rel_end) = tag[val_start..].find('"') {
+                let val_end = val_start + rel_end;
+                if let Some(v) = transform_value {
+                    tag.replace_range(val_start..val_end, &v);
+                } else {
+                    let rm_start = pos.saturating_sub(1);
+                    let rm_end = val_end + 1;
+                    if rm_end <= tag.len() {
+                        tag.replace_range(rm_start..rm_end, "");
+                    }
+                }
+            }
+        } else if let Some(v) = transform_value {
+            let insert_at = tag.rfind('>').unwrap_or(tag.len());
+            let insert = format!(" transform=\"{}\"", v);
+            tag.insert_str(insert_at, &insert);
+        }
+
+        self.svg_current.replace_range(start..=end, &tag);
+        self.pane_transform.insert(section.to_string(), (dx, dy));
     }
 
     fn set_main_transform(&mut self, dx: f64, dy: f64) {
@@ -325,6 +453,21 @@ impl VbrRuntime {
         }
 
         self.svg_current.replace_range(start..=end, &tag);
+        self.main_transform = (dx, dy);
+    }
+}
+
+fn lerp(a: f64, b: f64, t: f64) -> f64 {
+    a + (b - a) * t
+}
+
+fn offscreen_offset(section: &str, size: f64) -> (f64, f64) {
+    match section {
+        "left" => (-size, 0.0),
+        "right" => (size, 0.0),
+        "top" => (0.0, -size),
+        "bottom" => (0.0, size),
+        _ => (0.0, 0.0),
     }
 }
 
@@ -343,15 +486,67 @@ fn extract_main_nudges(svg: &str) -> (f64, f64, f64, f64) {
             continue;
         }
         if n.tag_name().name() == "g" && n.attribute("id") == Some("vbr-main") {
-            let left = n.attribute((ns, "nudge-left")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
-            let right = n.attribute((ns, "nudge-right")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
-            let top = n.attribute((ns, "nudge-top")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
-            let bottom = n.attribute((ns, "nudge-bottom")).and_then(|v| v.parse::<f64>().ok()).unwrap_or(0.0);
+            let left = n
+                .attribute((ns, "nudge-left"))
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(0.0);
+            let right = n
+                .attribute((ns, "nudge-right"))
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(0.0);
+            let top = n
+                .attribute((ns, "nudge-top"))
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(0.0);
+            let bottom = n
+                .attribute((ns, "nudge-bottom"))
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(0.0);
             return (left, right, top, bottom);
         }
     }
 
     (0.0, 0.0, 0.0, 0.0)
+}
+
+fn extract_pane_sizes(svg: &str) -> HashMap<String, f64> {
+    let mut out = HashMap::new();
+    let doc = match roxmltree::Document::parse(svg) {
+        Ok(d) => d,
+        Err(_) => return out,
+    };
+    let ns = doc
+        .root_element()
+        .lookup_namespace_uri(Some("vbr"))
+        .unwrap_or("http://vbr.dev/ui");
+
+    for n in doc.descendants() {
+        if !n.is_element() || n.tag_name().name() != "g" {
+            continue;
+        }
+        let Some(section) = n.attribute((ns, "section")) else {
+            continue;
+        };
+        match section {
+            "left" | "right" => {
+                let w = n
+                    .attribute((ns, "width"))
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+                out.insert(section.to_string(), w);
+            }
+            "top" | "bottom" => {
+                let h = n
+                    .attribute((ns, "height"))
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .unwrap_or(0.0);
+                out.insert(section.to_string(), h);
+            }
+            _ => {}
+        }
+    }
+
+    out
 }
 
 fn build_hit_table(svg: &str) -> Vec<WidgetInfo> {
@@ -398,7 +593,9 @@ fn walk_for_widgets(
             if let Some(bounds) = compute_bounds(node) {
                 let id = node.attribute("id").unwrap_or("unnamed").to_string();
                 let action = node.attribute((ns, "action")).map(|s| s.to_string());
-                let mousedown_fill = node.attribute((ns, "mousedown-fill")).map(|s| s.to_string());
+                let mousedown_fill = node
+                    .attribute((ns, "mousedown-fill"))
+                    .map(|s| s.to_string());
                 let (fill_id, normal_fill) = find_fill_target(node, ns);
 
                 widgets.push(WidgetInfo {
