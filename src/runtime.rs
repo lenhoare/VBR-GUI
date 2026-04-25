@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+const PANE_ANIMATION_MS: u64 = 160;
+
 #[derive(Debug, Clone)]
 pub struct WidgetInfo {
     pub id: String,
@@ -19,7 +21,6 @@ pub struct WidgetInfo {
 struct PaneTransition {
     section: String,
     show: bool,
-    nudge: bool,
     start: Instant,
     duration: Duration,
     pane_from: (f64, f64),
@@ -131,11 +132,13 @@ impl VbrRuntime {
 
         let elapsed = Instant::now().saturating_duration_since(tr.start);
         let t = (elapsed.as_secs_f64() / tr.duration.as_secs_f64()).clamp(0.0, 1.0);
+        // Smooth ease-out for less mechanical pane motion.
+        let te = ease_out_cubic(t);
 
-        let px = lerp(tr.pane_from.0, tr.pane_to.0, t);
-        let py = lerp(tr.pane_from.1, tr.pane_to.1, t);
-        let mx = lerp(tr.main_from.0, tr.main_to.0, t);
-        let my = lerp(tr.main_from.1, tr.main_to.1, t);
+        let px = lerp(tr.pane_from.0, tr.pane_to.0, te);
+        let py = lerp(tr.pane_from.1, tr.pane_to.1, te);
+        let mx = lerp(tr.main_from.0, tr.main_to.0, te);
+        let my = lerp(tr.main_from.1, tr.main_to.1, te);
 
         self.pane_transform.insert(tr.section.clone(), (px, py));
         self.main_transform = (mx, my);
@@ -316,9 +319,8 @@ impl VbrRuntime {
         self.transition = Some(PaneTransition {
             section: section.to_string(),
             show,
-            nudge,
             start: Instant::now(),
-            duration: Duration::from_millis(160),
+            duration: Duration::from_millis(PANE_ANIMATION_MS),
             pane_from,
             pane_to,
             main_from,
@@ -459,6 +461,10 @@ impl VbrRuntime {
 
 fn lerp(a: f64, b: f64, t: f64) -> f64 {
     a + (b - a) * t
+}
+
+fn ease_out_cubic(t: f64) -> f64 {
+    1.0 - (1.0 - t).powi(3)
 }
 
 fn offscreen_offset(section: &str, size: f64) -> (f64, f64) {
