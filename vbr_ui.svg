@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:vbr="http://vbr.dev/ui"
+     width="390" height="844"
+     viewBox="0 0 390 844"
+     style="background:#1a1a1a">
+
+  <!-- ============================================================
+       VBR UI DEFINITION
+       Panes: main, left, right, top, bottom
+       Each pane is a <g> with vbr:section attribute
+       vbr:show="visible|hidden"
+       Widgets carry vbr:type and state attributes
+       ============================================================ -->
+
+  <!-- ============================================================
+       MAIN PANE
+       The primary content area. Always visible.
+       When left pane nudges, this translates right by vbr:nudge-x
+       ============================================================ -->
+  <g id="vbr-main"
+     vbr:section="main"
+     vbr:show="visible"
+     vbr:nudge-left="240"
+     vbr:nudge-right="0"
+     vbr:nudge-top="0"
+     vbr:nudge-bottom="0">
+
+    <!-- Background -->
+    <rect x="0" y="0" width="390" height="844" fill="#1a1a1a"/>
+
+    <!-- Top bar -->
+    <rect x="0" y="0" width="390" height="56" fill="#1a1a1a"/>
+
+    <!-- Hamburger / panel toggle button -->
+    <g id="btn_menu"
+       vbr:type="button"
+       vbr:action="show-left-nudge"
+       vbr:hover-fill="#2a2a2a"
+       vbr:mousedown-fill="#333333">
+      <rect x="8" y="8" width="44" height="44" rx="10" fill="#2a2a2a"
+            vbr:fill-id="btn_menu_bg"/>
+      <!-- hamburger icon lines -->
+      <rect x="18" y="22" width="18" height="2" rx="1" fill="#888888"/>
+      <rect x="18" y="28" width="18" height="2" rx="1" fill="#888888"/>
+      <rect x="18" y="34" width="18" height="2" rx="1" fill="#888888"/>
+    </g>
+
+    <!-- Title -->
+    <text x="66" y="37"
+          font-family="sans-serif" font-size="17" font-weight="600"
+          fill="#cccccc">Tiny Recursive Learner</text>
+
+    <!-- Top bar right icons -->
+    <g id="btn_book"
+       vbr:type="button"
+       vbr:hover-fill="#2a2a2a"
+       vbr:mousedown-fill="#333333">
+      <rect x="290" y="10" width="40" height="36" rx="8" fill="transparent"
+            vbr:fill-id="btn_book_bg"/>
+      <!-- book icon simplified -->
+      <rect x="303" y="18" width="14" height="18" rx="1" fill="none" stroke="#888" stroke-width="1.5"/>
+      <line x1="310" y1="18" x2="310" y2="36" stroke="#888" stroke-width="1.5"/>
+    </g>
+
+    <g id="btn_more"
+       vbr:type="button"
+       vbr:action="show-bottom-overlay"
+       vbr:hover-fill="#2a2a2a"
+       vbr:mousedown-fill="#333333">
+      <rect x="338" y="10" width="44" height="36" rx="8" fill="transparent"
+            vbr:fill-id="btn_more_bg"/>
+      <!-- three dots -->
+      <circle cx="352" cy="28" r="2.5" fill="#888888"/>
+      <circle cx="360" cy="28" r="2.5" fill="#888888"/>
+      <circle cx="368" cy="28" r="2.5" fill="#888888"/>
+    </g>
+
+    <!-- Divider -->
+    <line x1="0" y1="56" x2="390" y2="56" stroke="#2a2a2a" stroke-width="1"/>
+
+    <!-- Content area -->
+    <!-- Decorative hash marks (obsidian style) -->
+    <text x="16" y="80" font-family="monospace" font-size="10" fill="#444444">|||||||</text>
+
+    <!-- Main heading -->
+    <text x="16" y="116" font-family="sans-serif" font-size="20" font-weight="700" fill="#dddddd">Tiny Recursive Model (TRM) —</text>
+    <text x="16" y="142" font-family="sans-serif" font-size="20" font-weight="700" fill="#dddddd">Sudoku (9×9) toy trainer</text>
+
+    <!-- Divider line (obsidian === style) -->
+    <text x="16" y="160" font-family="monospace" font-size="9" fill="#333333">================================================</text>
+    <text x="16" y="172" font-family="monospace" font-size="9" fill="#333333">============</text>
+
+    <!-- Body text -->
+    <text x="16" y="198" font-family="sans-serif" font-size="14" fill="#999999">A minimal, self-contained PyTorch implementation</text>
+    <text x="16" y="216" font-family="sans-serif" font-size="14" fill="#999999">of a TRM-style recursive reasoning model trained</text>
+    <text x="16" y="234" font-family="sans-serif" font-size="14" fill="#999999">end-to-end to complete Sudoku grids.</text>
+
+    <!-- Bullet points -->
+    <circle cx="24" cy="262" r="3" fill="#666666"/>
+    <text x="34" y="266" font-family="sans-serif" font-size="13" fill="#999999">Single tiny network (2 Transformer blocks</text>
+    <text x="34" y="282" font-family="sans-serif" font-size="13" fill="#999999">by default)</text>
+
+    <circle cx="24" cy="302" r="3" fill="#666666"/>
+    <text x="34" y="306" font-family="sans-serif" font-size="13" fill="#999999">Recursive latent refinement: given (x, y, z)</text>
+    <text x="34" y="322" font-family="sans-serif" font-size="13" fill="#999999">the model improves z then y</text>
+
+    <circle cx="24" cy="342" r="3" fill="#666666"/>
+    <text x="34" y="346" font-family="sans-serif" font-size="13" fill="#999999">Deep supervision over multiple improvement</text>
+    <text x="34" y="362" font-family="sans-serif" font-size="13" fill="#999999">steps with detach</text>
+
+    <circle cx="24" cy="382" r="3" fill="#666666"/>
+    <text x="34" y="386" font-family="sans-serif" font-size="13" fill="#999999">Optional ACT-lite halting head and EMA for</text>
+    <text x="34" y="402" font-family="sans-serif" font-size="13" fill="#999999">stability</text>
+
+    <circle cx="24" cy="422" r="3" fill="#666666"/>
+    <text x="34" y="426" font-family="sans-serif" font-size="13" fill="#999999">Synthetic Sudoku generator + dihedral/digit-</text>
+    <text x="34" y="442" font-family="sans-serif" font-size="13" fill="#999999">permutation augmentations</text>
+
+    <!-- Section heading -->
+    <text x="16" y="480" font-family="sans-serif" font-size="17" font-weight="700" fill="#dddddd">Dependencies</text>
+    <line x1="16" y1="488" x2="200" y2="488" stroke="#333333" stroke-width="1"/>
+
+    <text x="16" y="510" font-family="sans-serif" font-size="13" fill="#999999">pip install torch numpy</text>
+
+    <text x="16" y="548" font-family="sans-serif" font-size="17" font-weight="700" fill="#dddddd">Usage</text>
+    <line x1="16" y1="556" x2="200" y2="556" stroke="#333333" stroke-width="1"/>
+
+    <!-- Bottom toolbar -->
+    <rect x="0" y="772" width="390" height="72" rx="0" fill="#111111"/>
+    <line x1="0" y1="772" x2="390" y2="772" stroke="#2a2a2a" stroke-width="1"/>
+
+    <!-- Bottom toolbar pill background -->
+    <rect x="20" y="780" width="350" height="52" rx="26" fill="#222222"/>
+
+    <!-- Toolbar buttons -->
+    <!-- Back -->
+    <g id="btn_back" vbr:type="button" vbr:hover-fill="#2a2a2a" vbr:mousedown-fill="#333333">
+      <rect x="32" y="788" width="44" height="36" rx="8" fill="transparent" vbr:fill-id="btn_back_bg"/>
+      <text x="54" y="810" font-family="sans-serif" font-size="16" fill="#666666" text-anchor="middle">‹</text>
+    </g>
+
+    <!-- Forward -->
+    <g id="btn_fwd" vbr:type="button" vbr:hover-fill="#2a2a2a" vbr:mousedown-fill="#333333">
+      <rect x="82" y="788" width="44" height="36" rx="8" fill="transparent" vbr:fill-id="btn_fwd_bg"/>
+      <text x="104" y="810" font-family="sans-serif" font-size="16" fill="#666666" text-anchor="middle">›</text>
+    </g>
+
+    <!-- Search -->
+    <g id="btn_search" vbr:type="button" vbr:hover-fill="#2a2a2a" vbr:mousedown-fill="#333333">
+      <rect x="152" y="788" width="44" height="36" rx="8" fill="transparent" vbr:fill-id="btn_search_bg"/>
+      <circle cx="172" cy="804" r="7" fill="none" stroke="#666666" stroke-width="1.5"/>
+      <line x1="177" y1="809" x2="183" y2="815" stroke="#666666" stroke-width="1.5"/>
+    </g>
+
+    <!-- New -->
+    <g id="btn_new" vbr:type="button" vbr:hover-fill="#2a2a2a" vbr:mousedown-fill="#333333">
+      <rect x="208" y="788" width="44" height="36" rx="8" fill="transparent" vbr:fill-id="btn_new_bg"/>
+      <text x="230" y="812" font-family="sans-serif" font-size="22" fill="#666666" text-anchor="middle">+</text>
+    </g>
+
+    <!-- Tab count -->
+    <g id="btn_tabs" vbr:type="button" vbr:hover-fill="#2a2a2a" vbr:mousedown-fill="#333333">
+      <rect x="264" y="792" width="36" height="28" rx="6" fill="transparent" stroke="#666666" stroke-width="1.5" vbr:fill-id="btn_tabs_bg"/>
+      <text x="282" y="810" font-family="sans-serif" font-size="12" font-weight="600" fill="#666666" text-anchor="middle">54</text>
+    </g>
+
+    <!-- Hamburger bottom right -->
+    <g id="btn_menu2" vbr:type="button" vbr:action="show-bottom-overlay" vbr:hover-fill="#2a2a2a" vbr:mousedown-fill="#333333">
+      <rect x="316" y="788" width="44" height="36" rx="8" fill="transparent" vbr:fill-id="btn_menu2_bg"/>
+      <rect x="326" y="800" width="18" height="2" rx="1" fill="#666666"/>
+      <rect x="326" y="806" width="18" height="2" rx="1" fill="#666666"/>
+      <rect x="326" y="812" width="18" height="2" rx="1" fill="#666666"/>
+    </g>
+
+  </g>
+
+  <!-- ============================================================
+       LEFT PANE
+       File browser panel. Slides in from left.
+       vbr:show="hidden" — hidden by default
+       vbr:width defines how much it takes up
+       ============================================================ -->
+  <g id="vbr-left"
+     vbr:section="left"
+     vbr:show="hidden"
+     vbr:width="240">
+
+    <rect x="0" y="0" width="240" height="844" fill="#111111"/>
+
+    <!-- Left panel top bar -->
+    <rect x="0" y="0" width="240" height="56" fill="#111111"/>
+    <text x="20" y="36" font-family="sans-serif" font-size="15" font-weight="600" fill="#cccccc">Files</text>
+
+    <!-- File list items -->
+    <!-- Each item is a button with action to open file -->
+    <g id="file_christmas" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="64" width="240" height="36" fill="transparent" vbr:fill-id="file_christmas_bg"/>
+      <text x="16" y="87" font-family="sans-serif" font-size="14" fill="#cccccc">Christmas Tree Packing</text>
+    </g>
+
+    <g id="file_clakker" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="100" width="240" height="36" fill="transparent" vbr:fill-id="file_clakker_bg"/>
+      <text x="16" y="123" font-family="sans-serif" font-size="14" fill="#cccccc">Clakker spec</text>
+    </g>
+
+    <g id="file_claudecode" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="136" width="240" height="36" fill="transparent" vbr:fill-id="file_claudecode_bg"/>
+      <text x="16" y="159" font-family="sans-serif" font-size="14" fill="#cccccc">Claude Code MD files</text>
+    </g>
+
+    <g id="file_claudedoc" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="172" width="240" height="36" fill="transparent" vbr:fill-id="file_claudedoc_bg"/>
+      <text x="16" y="195" font-family="sans-serif" font-size="14" fill="#cccccc">Claude DOC processing</text>
+    </g>
+
+    <g id="file_claudepdf" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="208" width="240" height="36" fill="transparent" vbr:fill-id="file_claudepdf_bg"/>
+      <text x="16" y="231" font-family="sans-serif" font-size="14" fill="#cccccc">Claude PDF processing</text>
+    </g>
+
+    <g id="file_claudeppt" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="244" width="240" height="36" fill="transparent" vbr:fill-id="file_claudeppt_bg"/>
+      <text x="16" y="267" font-family="sans-serif" font-size="14" fill="#cccccc">Claude PPT processing</text>
+    </g>
+
+    <g id="file_claudesoul" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="280" width="240" height="36" fill="transparent" vbr:fill-id="file_claudesoul_bg"/>
+      <text x="16" y="303" font-family="sans-serif" font-size="14" fill="#cccccc">Claude Soul</text>
+    </g>
+
+    <g id="file_claudexlsx" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="316" width="240" height="36" fill="transparent" vbr:fill-id="file_claudexlsx_bg"/>
+      <text x="16" y="339" font-family="sans-serif" font-size="14" fill="#cccccc">Claude XLSX processing</text>
+    </g>
+
+    <g id="file_creativity" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="352" width="240" height="36" fill="transparent" vbr:fill-id="file_creativity_bg"/>
+      <text x="16" y="375" font-family="sans-serif" font-size="14" fill="#cccccc">Creativity App</text>
+    </g>
+
+    <g id="file_cv" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="0" y="388" width="240" height="36" fill="transparent" vbr:fill-id="file_cv_bg"/>
+      <text x="16" y="411" font-family="sans-serif" font-size="14" fill="#cccccc">CV Len Hoare</text>
+    </g>
+
+    <!-- Scrollbar hint -->
+    <rect x="234" y="100" width="3" height="120" rx="2" fill="#333333"/>
+
+    <!-- Bottom of left panel -->
+    <rect x="0" y="756" width="240" height="88" fill="#0d0d0d"/>
+    <line x1="0" y1="756" x2="240" y2="756" stroke="#2a2a2a" stroke-width="1"/>
+
+    <!-- Bottom left toolbar icons -->
+    <g id="btn_left_edit" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="8" y="764" width="36" height="36" rx="6" fill="transparent" vbr:fill-id="btn_left_edit_bg"/>
+      <rect x="18" y="776" width="14" height="16" rx="1" fill="none" stroke="#666" stroke-width="1.5"/>
+      <line x1="22" y1="773" x2="26" y2="777" stroke="#666" stroke-width="1.5"/>
+    </g>
+
+    <g id="btn_left_folder" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="52" y="764" width="36" height="36" rx="6" fill="transparent" vbr:fill-id="btn_left_folder_bg"/>
+      <rect x="62" y="774" width="16" height="12" rx="2" fill="none" stroke="#666" stroke-width="1.5"/>
+      <path d="M62 776 L66 772 L70 772 L70 774" fill="none" stroke="#666" stroke-width="1.5"/>
+    </g>
+
+    <g id="btn_left_sort" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="96" y="764" width="36" height="36" rx="6" fill="transparent" vbr:fill-id="btn_left_sort_bg"/>
+      <line x1="107" y1="776" x2="121" y2="776" stroke="#666" stroke-width="1.5"/>
+      <line x1="107" y1="782" x2="118" y2="782" stroke="#666" stroke-width="1.5"/>
+      <line x1="107" y1="788" x2="115" y2="788" stroke="#666" stroke-width="1.5"/>
+      <polyline points="118,771 122,776 118,781" fill="none" stroke="#666" stroke-width="1.5"/>
+    </g>
+
+    <g id="btn_left_layout" vbr:type="button" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="140" y="764" width="36" height="36" rx="6" fill="transparent" vbr:fill-id="btn_left_layout_bg"/>
+      <rect x="150" y="773" width="16" height="18" rx="2" fill="none" stroke="#666" stroke-width="1.5"/>
+    </g>
+
+    <g id="btn_left_close" vbr:type="button" vbr:action="hide-left" vbr:hover-fill="#1e1e1e" vbr:mousedown-fill="#252525">
+      <rect x="184" y="764" width="36" height="36" rx="6" fill="transparent" vbr:fill-id="btn_left_close_bg"/>
+      <line x1="194" y1="776" x2="210" y2="792" stroke="#666" stroke-width="1.5"/>
+      <line x1="210" y1="776" x2="194" y2="792" stroke="#666" stroke-width="1.5"/>
+    </g>
+
+    <!-- Files label and vault info -->
+    <rect x="8" y="806" width="180" height="28" rx="6" fill="#1a1a1a"/>
+    <text x="36" y="824" font-family="sans-serif" font-size="13" fill="#888888">Files</text>
+    <!-- folder icon -->
+    <rect x="14" y="814" width="14" height="10" rx="2" fill="none" stroke="#666" stroke-width="1.2"/>
+
+    <text x="8" y="844" font-family="sans-serif" font-size="11" fill="#555555">Main  ↓   103 files, 16 folders</text>
+
+  </g>
+
+  <!-- ============================================================
+       RIGHT PANE  
+       vbr:show="hidden" by default
+       vbr:width defines panel width
+       ============================================================ -->
+  <g id="vbr-right"
+     vbr:section="right"
+     vbr:show="hidden"
+     vbr:width="240">
+
+    <rect x="150" y="0" width="240" height="844" fill="#111111"/>
+    <text x="166" y="36" font-family="sans-serif" font-size="15" font-weight="600" fill="#cccccc">Right Panel</text>
+
+  </g>
+
+  <!-- ============================================================
+       TOP PANE
+       vbr:show="hidden" by default
+       vbr:height defines panel height
+       ============================================================ -->
+  <g id="vbr-top"
+     vbr:section="top"
+     vbr:show="hidden"
+     vbr:height="200">
+
+    <rect x="0" y="0" width="390" height="200" fill="#111111"/>
+    <text x="16" y="36" font-family="sans-serif" font-size="15" font-weight="600" fill="#cccccc">Top Panel</text>
+
+  </g>
+
+  <!-- ============================================================
+       BOTTOM PANE
+       Menu / action sheet. Rises from bottom.
+       Modelled on Obsidian's bottom action sheet.
+       vbr:show="hidden" by default
+       vbr:height defines how tall the sheet is
+       ============================================================ -->
+  <g id="vbr-bottom"
+     vbr:section="bottom"
+     vbr:show="hidden"
+     vbr:height="420">
+
+    <!-- Scrim / dim overlay behind sheet -->
+    <rect x="0" y="0" width="390" height="844"
+          fill="#000000" fill-opacity="0.5"
+          vbr:type="dismiss"
+          vbr:action="hide-bottom"/>
+
+    <!-- Sheet itself -->
+    <rect x="0" y="424" width="390" height="420"
+          rx="16" ry="16"
+          fill="#1e1e1e"/>
+
+    <!-- Drag handle -->
+    <rect x="175" y="436" width="40" height="4" rx="2" fill="#444444"/>
+
+    <!-- Menu items -->
+    <!-- Create new base -->
+    <g id="menu_newbase" vbr:type="button" vbr:hover-fill="#252525" vbr:mousedown-fill="#2e2e2e">
+      <rect x="8" y="452" width="374" height="48" rx="10" fill="#252525" vbr:fill-id="menu_newbase_bg"/>
+      <!-- icon placeholder -->
+      <rect x="22" y="466" width="18" height="14" rx="2" fill="none" stroke="#888" stroke-width="1.5"/>
+      <line x1="22" y1="471" x2="30" y2="471" stroke="#888" stroke-width="1.2"/>
+      <line x1="22" y1="475" x2="28" y2="475" stroke="#888" stroke-width="1.2"/>
+      <text x="52" y="481" font-family="sans-serif" font-size="15" fill="#cccccc">Create new base</text>
+    </g>
+
+    <!-- Open quick switcher -->
+    <g id="menu_switcher" vbr:type="button" vbr:hover-fill="#252525" vbr:mousedown-fill="#2e2e2e">
+      <rect x="8" y="508" width="374" height="48" rx="10" fill="transparent" vbr:fill-id="menu_switcher_bg"/>
+      <circle cx="31" cy="532" r="8" fill="none" stroke="#888" stroke-width="1.5"/>
+      <line x1="37" y1="538" x2="43" y2="544" stroke="#888" stroke-width="1.5"/>
+      <text x="52" y="537" font-family="sans-serif" font-size="15" fill="#cccccc">Open quick switcher</text>
+    </g>
+
+    <!-- Open graph view -->
+    <g id="menu_graph" vbr:type="button" vbr:hover-fill="#252525" vbr:mousedown-fill="#2e2e2e">
+      <rect x="8" y="560" width="374" height="48" rx="10" fill="transparent" vbr:fill-id="menu_graph_bg"/>
+      <!-- graph icon -->
+      <circle cx="27" cy="584" r="4" fill="none" stroke="#888" stroke-width="1.5"/>
+      <circle cx="39" cy="578" r="3" fill="none" stroke="#888" stroke-width="1.5"/>
+      <circle cx="39" cy="590" r="3" fill="none" stroke="#888" stroke-width="1.5"/>
+      <line x1="31" y1="582" x2="36" y2="579" stroke="#888" stroke-width="1.2"/>
+      <line x1="31" y1="586" x2="36" y2="589" stroke="#888" stroke-width="1.2"/>
+      <text x="52" y="589" font-family="sans-serif" font-size="15" fill="#cccccc">Open graph view</text>
+    </g>
+
+    <!-- Create new canvas -->
+    <g id="menu_canvas" vbr:type="button" vbr:hover-fill="#252525" vbr:mousedown-fill="#2e2e2e">
+      <rect x="8" y="612" width="374" height="48" rx="10" fill="transparent" vbr:fill-id="menu_canvas_bg"/>
+      <rect x="20" y="626" width="10" height="10" rx="1" fill="none" stroke="#888" stroke-width="1.5"/>
+      <rect x="32" y="626" width="10" height="10" rx="1" fill="none" stroke="#888" stroke-width="1.5"/>
+      <rect x="20" y="638" width="10" height="10" rx="1" fill="none" stroke="#888" stroke-width="1.5"/>
+      <rect x="32" y="638" width="10" height="10" rx="1" fill="none" stroke="#888" stroke-width="1.5"/>
+      <text x="52" y="641" font-family="sans-serif" font-size="15" fill="#cccccc">Create new canvas</text>
+    </g>
+
+    <!-- Open today's daily note -->
+    <g id="menu_daily" vbr:type="button" vbr:hover-fill="#252525" vbr:mousedown-fill="#2e2e2e">
+      <rect x="8" y="664" width="374" height="48" rx="10" fill="transparent" vbr:fill-id="menu_daily_bg"/>
+      <rect x="20" y="676" width="20" height="20" rx="3" fill="none" stroke="#888" stroke-width="1.5"/>
+      <line x1="20" y1="682" x2="40" y2="682" stroke="#888" stroke-width="1.2"/>
+      <text x="27" y="694" font-family="sans-serif" font-size="8" fill="#888888">15</text>
+      <text x="52" y="693" font-family="sans-serif" font-size="15" fill="#cccccc">Open today's daily note</text>
+    </g>
+
+    <!-- Open command palette -->
+    <g id="menu_cmd" vbr:type="button" vbr:hover-fill="#252525" vbr:mousedown-fill="#2e2e2e">
+      <rect x="8" y="716" width="374" height="48" rx="10" fill="transparent" vbr:fill-id="menu_cmd_bg"/>
+      <text x="20" y="745" font-family="monospace" font-size="14" fill="#888888">&gt;_</text>
+      <text x="52" y="745" font-family="sans-serif" font-size="15" fill="#cccccc">Open command palette</text>
+    </g>
+
+    <!-- Close / dismiss button at very bottom -->
+    <g id="menu_close" vbr:type="button" vbr:action="hide-bottom" vbr:hover-fill="#252525" vbr:mousedown-fill="#2e2e2e">
+      <rect x="8" y="768" width="374" height="40" rx="10" fill="#252525" vbr:fill-id="menu_close_bg"/>
+      <text x="195" y="793" font-family="sans-serif" font-size="14" fill="#888888" text-anchor="middle">Close</text>
+    </g>
+
+  </g>
+
+</svg>
