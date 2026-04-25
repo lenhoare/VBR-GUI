@@ -139,7 +139,7 @@
       <rect id="input_notes_bg" x="16" y="578" width="320" height="40" rx="8"
             fill="#1f1f1f" stroke="#444444" stroke-width="1.5"
             vbr:fill-id="input_notes_bg"/>
-      <text id="input_notes_text" x="28" y="604" font-family="DejaVu Sans" font-size="14" fill="#dddddd"></text>
+      <text id="input_notes_text" x="28" y="604" font-family="DejaVu Sans" font-size="14" fill="#dddddd"> </text>
       <rect id="input_notes_cursor" x="28" y="587" width="2" height="22" fill="#dddddd" display="none"/>
     </g>
 

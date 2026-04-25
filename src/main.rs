@@ -160,6 +160,7 @@ impl ApplicationHandler for App {
                     if let Some(ref w) = self.window {
                         w.request_redraw();
                     }
+                    println!("TEXT_INPUT_APPLIED");
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -217,6 +218,7 @@ impl ApplicationHandler for App {
                     if let Some(ref w) = self.window {
                         w.request_redraw();
                     }
+                    println!("TEXT_INPUT_APPLIED");
                 }
             }
             WindowEvent::Ime(Ime::Commit(text)) => {
@@ -224,6 +226,7 @@ impl ApplicationHandler for App {
                     if let Some(ref w) = self.window {
                         w.request_redraw();
                     }
+                    println!("TEXT_INPUT_APPLIED");
                 }
             }
             _ => {}

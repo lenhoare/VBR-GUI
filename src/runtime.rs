@@ -567,7 +567,8 @@ impl VbrRuntime {
             .find("</text>")
             .map(|i| open_end + 1 + i)
             .unwrap_or(self.svg_current.len());
-        self.svg_current.replace_range((open_end + 1)..close, value);
+        self.svg_current
+            .replace_range((open_end + 1)..close, &xml_escape_text(value));
     }
 
     fn set_rect_x_by_id(&mut self, id: &str, x: f64) {
@@ -1041,6 +1042,12 @@ fn parse_attr(node: &roxmltree::Node, name: &str) -> Option<f64> {
 
 fn char_to_byte_idx(s: &str, char_idx: usize) -> usize {
     s.char_indices().nth(char_idx).map(|(i, _)| i).unwrap_or(s.len())
+}
+
+fn xml_escape_text(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn coalesce_dirty_rects(mut rects: Vec<DirtyRect>) -> Vec<DirtyRect> {
