@@ -10,6 +10,8 @@ use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
 use winit::event::{ElementState, MouseButton};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, OwnedDisplayHandle};
+use winit::event::Ime;
+use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowAttributes};
 
 const SVG_PATH: &str = "vbr_ui.svg";
@@ -20,7 +22,6 @@ struct App {
     context: Option<softbuffer::Context<OwnedDisplayHandle>>,
     runtime: runtime::VbrRuntime,
     renderer: renderer::Renderer,
-    /// Last known cursor position (SVG/physical coordinates)
     cursor_pos: PhysicalPosition<f64>,
 }
 
@@ -56,7 +57,7 @@ impl App {
                 return;
             }
         };
-        let pix_data = pixmap.data(); // RGBA premultiplied
+        let pix_data = pixmap.data();
 
         let Some(ref mut surface) = self.surface else {
             return;
@@ -122,19 +123,16 @@ impl ApplicationHandler for App {
                 .expect("failed to create window"),
         );
 
-        // Context may already exist (created before run_app)
-        let context = self
-            .context
-            .get_or_insert_with(|| {
-                softbuffer::Context::new(event_loop.owned_display_handle())
-                    .expect("softbuffer context")
-            });
+        let context = self.context.get_or_insert_with(|| {
+            softbuffer::Context::new(event_loop.owned_display_handle()).expect("softbuffer context")
+        });
 
-        let surface = softbuffer::Surface::new(context, window.clone())
-            .expect("softbuffer surface");
+        let surface = softbuffer::Surface::new(context, window.clone()).expect("softbuffer surface");
 
         self.surface = Some(surface);
-        self.window = Some(window);
+        self.window = Some(window.clone());
+
+        window.set_ime_allowed(true);
 
         let dirty = self.runtime.take_dirty_rects();
         self.present_frame(&dirty);
@@ -201,6 +199,31 @@ impl ApplicationHandler for App {
                 self.runtime.handle_mouse_up();
                 if let Some(ref w) = self.window {
                     w.request_redraw();
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                if !event.state.is_pressed() {
+                    return;
+                }
+
+                let mut changed = false;
+                if let Key::Named(NamedKey::Backspace) = event.logical_key.as_ref() {
+                    changed = self.runtime.handle_backspace();
+                } else if let Some(text) = &event.text {
+                    changed = self.runtime.handle_text_input(text.as_ref());
+                }
+
+                if changed {
+                    if let Some(ref w) = self.window {
+                        w.request_redraw();
+                    }
+                }
+            }
+            WindowEvent::Ime(Ime::Commit(text)) => {
+                if self.runtime.handle_text_input(&text) {
+                    if let Some(ref w) = self.window {
+                        w.request_redraw();
+                    }
                 }
             }
             _ => {}
